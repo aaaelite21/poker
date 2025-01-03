@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Tournament Clock</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        h1 {
+            margin: 20px 0;
+            font-size: 3rem;
+        }
+
+        #clock {
+            font-size: 5rem;
+            margin: 20px 0;
+            color: #00ff00;
+        }
+
+        .blind-level {
+            font-size: 1.5rem;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #333333;
+        }
+
+        button:active {
+            background-color: #555555;
+        }
+
+        #controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="progress-bar" style="width: 100%; background: #444; height: 20px;">
+        <div id="progress" style="width: 0%; background: #00ff00; height: 100%;"></div>
+    </div>
+    <h1>Poker Tournament Clock</h1>
+    <div id="clock">00:00</div>
+    <div class="blind-level">
+        <p>Big Blind: <span id="big-blind">0</span></p>
+        <p>Little Blind: <span id="little-blind">0</span></p>
+    </div>
+    <div id="status" style="font-size: 1.2rem;">Status: Paused</div>
+    <div id="controls">
+        <button onclick="startClock()">Start</button>
+        <button onclick="pauseClock()">Pause</button>
+        <button onclick="resetClock()">Reset</button>
+    </div>
+    <button onclick="showCustomLevels()">Edit Blind Levels</button>
+    <div id="custom-levels" style="display: none;">
+        <textarea id="blind-data" rows="10" cols="30"></textarea>
+        <button onclick="applyCustomLevels()">Apply</button>
+    </div>
+
+    <script>
+        let timer = null;
+        let timeRemaining = 900; // 15 minutes in seconds
+        let currentLevel = 0;
+
+        const blindLevels = [
+            { bigBlind: 5, littleBlind: 2 },
+            { bigBlind: 10, littleBlind: 5 },
+            { bigBlind: 20, littleBlind: 10 },
+            { bigBlind: 50, littleBlind: 25 },
+            { bigBlind: 100, littleBlind: 50 },
+            { bigBlind: 200, littleBlind: 100 }
+        ];
+
+        document.getElementById('blind-data').value = JSON.stringify(blindLevels)
+
+        function updateClock() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+
+            document.getElementById('clock').textContent =
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+            if (timeRemaining === 0) {
+                nextLevel();
+            }
+        }
+
+        function updateBlinds() {
+            if (currentLevel < blindLevels.length) {
+                const { bigBlind, littleBlind } = blindLevels[currentLevel];
+                document.getElementById('big-blind').textContent = bigBlind;
+                document.getElementById('little-blind').textContent = littleBlind;
+            } else {
+                document.getElementById('big-blind').textContent = "N/A";
+                document.getElementById('little-blind').textContent = "N/A";
+            }
+        }
+
+        function nextLevel() {
+            if (currentLevel < blindLevels.length - 1) {
+                if (currentLevel % 3 === 0 && currentLevel !== 0) {
+                    // Every 3 levels, take a break
+                    timeRemaining = 300; // 5-minute break
+                    document.getElementById('clock').textContent = "Break Time!";
+                } else {
+                    currentLevel++;
+                    timeRemaining = 900;
+                    updateBlinds();
+                }
+            }
+        }
+
+        function startClock() {
+            if (!timer) {
+                timer = setInterval(() => {
+                    if (timeRemaining > 0) {
+                        timeRemaining--;
+                        updateClock();
+                    } else {
+                        nextLevel();
+                    }
+                }, 1000);
+                document.getElementById('status').textContent = "Status: Running";
+            }
+        }
+
+        function pauseClock() {
+            clearInterval(timer);
+            timer = null;
+            document.getElementById('status').textContent = "Status: Paused";
+        }
+
+        function resetClock() {
+            clearInterval(timer);
+            timer = null;
+            timeRemaining = 900;
+            currentLevel = 0;
+            updateClock();
+            updateBlinds();
+            pauseClock();
+        }
+
+        // edit blind levels
+        function showCustomLevels() {
+            document.getElementById('custom-levels').style.display = 'block';
+        }
+
+        function applyCustomLevels() {
+            const data = JSON.parse(document.getElementById('blind-data').value);
+            blindLevels.splice(0, blindLevels.length, ...data);
+            resetClock();
+            document.getElementById('custom-levels').style.display = 'none';
+
+        }
+
+        //loading bar
+        function updateProgressBar() {
+            const progress = (currentLevel / blindLevels.length) * 100;
+            document.getElementById('progress').style.width = `${progress}%`;
+        }
+
+        //saving and loading
+        function saveState() {
+            localStorage.setItem('clockState', JSON.stringify({ timeRemaining, currentLevel }));
+        }
+
+        function loadState() {
+            const state = JSON.parse(localStorage.getItem('clockState'));
+            if (state) {
+                timeRemaining = state.timeRemaining;
+                currentLevel = state.currentLevel;
+                updateClock();
+                updateBlinds();
+            }
+        }
+
+        window.addEventListener('beforeunload', saveState);
+        window.addEventListener('load', loadState);
+
+        // Initialize the clock and blinds
+        updateClock();
+        updateBlinds();
+    </script>
+</body>
+
+</html>
