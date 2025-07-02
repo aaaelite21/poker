@@ -6,17 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Poker Tournament Clock</title>
     <style>
+        :root {
+            --bg: #121212;
+            --primary: #00ff88;
+            --text: #ffffff;
+            --button-bg: #1e1e1e;
+            --button-hover: #333333;
+            --button-active: #555555;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background-color: #121212;
-            color: #ffffff;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
             margin: 0;
             padding: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
         }
 
         h1 {
@@ -27,7 +36,7 @@
         #clock {
             font-size: 5rem;
             margin: 20px 0;
-            color: #00ff00;
+            color: var(--primary);
         }
 
         .blind-level {
@@ -41,31 +50,78 @@
             margin: 10px;
             border: none;
             border-radius: 5px;
-            background-color: #1e1e1e;
-            color: #ffffff;
+            background-color: var(--button-bg);
+            color: var(--text);
             cursor: pointer;
             transition: background-color 0.3s;
         }
 
         button:hover {
-            background-color: #333333;
+            background-color: var(--button-hover);
         }
 
         button:active {
-            background-color: #555555;
+            background-color: var(--button-active);
         }
 
         #controls {
             display: flex;
             gap: 15px;
             margin-top: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        #progress-bar {
+            width: 100%;
+            background: #444;
+            height: 20px;
+        }
+
+        #progress {
+            width: 0%;
+            background: var(--primary);
+            height: 100%;
+        }
+
+        #status {
+            font-size: 1.2rem;
+        }
+
+        #custom-levels {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+            margin-top: 15px;
+        }
+
+        #blind-data {
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 2rem;
+            }
+            #clock {
+                font-size: 3rem;
+            }
+            .blind-level {
+                font-size: 1.2rem;
+            }
+            button {
+                font-size: 1rem;
+                padding: 10px 20px;
+            }
         }
     </style>
 </head>
 
 <body>
-    <div id="progress-bar" style="width: 100%; background: #444; height: 20px;">
-        <div id="progress" style="width: 0%; background: #00ff00; height: 100%;"></div>
+    <div id="progress-bar">
+        <div id="progress"></div>
     </div>
     <h1>Poker Tournament Clock</h1>
     <div id="clock">00:00</div>
@@ -73,14 +129,14 @@
         <p>Big Blind: <span id="big-blind">0</span></p>
         <p>Little Blind: <span id="little-blind">0</span></p>
     </div>
-    <div id="status" style="font-size: 1.2rem;">Status: Paused</div>
+    <div id="status">Status: Paused</div>
     <div id="controls">
         <button onclick="startClock()">Start</button>
         <button onclick="pauseClock()">Pause</button>
         <button onclick="resetClock()">Reset</button>
     </div>
     <button onclick="showCustomLevels()">Edit Blind Levels</button>
-    <div id="custom-levels" style="display: none;">
+    <div id="custom-levels">
         <textarea id="blind-data" rows="10" cols="30"></textarea>
         <button onclick="applyCustomLevels()">Apply</button>
     </div>
@@ -118,6 +174,7 @@
                 const { bigBlind, littleBlind } = blindLevels[currentLevel];
                 document.getElementById('big-blind').textContent = bigBlind;
                 document.getElementById('little-blind').textContent = littleBlind;
+                updateProgressBar();
             } else {
                 document.getElementById('big-blind').textContent = "N/A";
                 document.getElementById('little-blind').textContent = "N/A";
@@ -134,6 +191,7 @@
                     currentLevel++;
                     timeRemaining = 900;
                     updateBlinds();
+                    updateProgressBar();
                 }
             }
         }
@@ -165,6 +223,7 @@
             currentLevel = 0;
             updateClock();
             updateBlinds();
+            updateProgressBar();
             pauseClock();
         }
 
@@ -199,6 +258,7 @@
                 currentLevel = state.currentLevel;
                 updateClock();
                 updateBlinds();
+                updateProgressBar();
             }
         }
 
@@ -208,6 +268,7 @@
         // Initialize the clock and blinds
         updateClock();
         updateBlinds();
+        updateProgressBar();
     </script>
 </body>
 
