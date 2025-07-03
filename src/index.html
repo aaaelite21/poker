@@ -85,6 +85,7 @@ createForm.addEventListener('submit', async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(createForm));
     data.levels = JSON.parse(data.levels);
+    data.stack = Number(data.stack);
     if(!adminToken){ alert('Admin login required'); return; }
     const res = await fetch('/api/create', {method:'POST',headers:{'Content-Type':'application/json','Authorization':adminToken},body:JSON.stringify(data)});
     const out = await res.json();

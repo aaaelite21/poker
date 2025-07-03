@@ -180,7 +180,7 @@ function startClock(){
 
 function render(game){
     const table = document.getElementById('players');
-    const header = '<tr><th>Seat</th><th>Name</th><th>Status</th><th>Rebuys</th><th></th></tr>';
+    const header = '<tr><th>Seat</th><th>Name</th><th>Stack</th><th>Status</th><th>Rebuys</th><th></th></tr>';
     const rows = game.players.map(p => {
         const status = p.busted ? 'Busted' : 'In';
         let btn = '';
@@ -189,7 +189,10 @@ function render(game){
         } else if(p.id === playerId){
             btn = `<button class="toggle" data-id="${p.id}">${p.busted?'Unbust':'I\'m Busted'}</button>`;
         }
-        return `<tr><td>${p.seat??''}</td><td>${p.name}</td><td>${status}</td><td>${p.rebuys}</td><td>${btn}</td></tr>`;
+        const stackCell = adminToken ?
+            `<input type="number" class="stack" data-id="${p.id}" value="${p.stack ?? 0}">` :
+            p.stack ?? 0;
+        return `<tr><td>${p.seat??''}</td><td>${p.name}</td><td>${stackCell}</td><td>${status}</td><td>${p.rebuys}</td><td>${btn}</td></tr>`;
     }).join('');
     table.innerHTML = header + rows;
     table.querySelectorAll('.toggle').forEach(btn => {
@@ -202,6 +205,15 @@ function render(game){
             await fetch(`/api/bust/${code}/${id}`,{method:'POST',headers,body:JSON.stringify({busted:!player.busted})});
         });
     });
+    if(adminToken){
+        table.querySelectorAll('.stack').forEach(inp => {
+            inp.addEventListener('change', async () => {
+                const id = inp.dataset.id;
+                const val = inp.value;
+                await fetch(`/api/stack/${code}/${id}`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':adminToken},body:JSON.stringify({stack:val})});
+            });
+        });
+    }
     const pot = (game.players.length * game.config.buyin) + game.players.reduce((s,p)=>s+p.rebuys*game.config.buyin,0);
     document.getElementById('pot').textContent = 'Total Pot $'+pot;
     const historyList = game.history.map(h => {

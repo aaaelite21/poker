@@ -92,7 +92,7 @@ app.post('/api/join/:code', (req, res) => {
   const game = games[code];
   if (!game) return res.status(404).json({ error: 'Game not found' });
   if (game.locked) return res.status(403).json({ error: 'Game locked' });
-  const player = { id: uuidv4(), name, seat: null, busted: false, rebuys: 0 };
+  const player = { id: uuidv4(), name, seat: null, busted: false, rebuys: 0, stack: game.config.stack || 0 };
   game.players.push(player);
   recordEvent(game, `${name} joined`);
   saveGames();
@@ -142,6 +142,20 @@ app.post('/api/bust/:code/:playerId', (req, res) => {
     return res.json(player);
   }
   res.status(403).json({ error: 'Not allowed' });
+});
+
+app.post('/api/stack/:code/:playerId', requireAdmin, (req, res) => {
+  const { code, playerId } = req.params;
+  const { stack } = req.body;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const player = game.players.find(p => p.id === playerId);
+  if (!player) return res.status(404).json({ error: 'Player not found' });
+  player.stack = Number(stack) || 0;
+  recordEvent(game, `${player.name} stack set to ${player.stack}`);
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json(player);
 });
 
 app.post('/api/assign-seats/:code', requireAdmin, (req, res) => {
