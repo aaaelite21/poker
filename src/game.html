@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Poker Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h1 id="code"></h1>
+<div id="clock">00:00</div>
+<table id="players"></table>
+<div id="pot"></div>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+const url = new URL(window.location);
+const code = url.searchParams.get('code');
+const playerId = url.searchParams.get('player');
+
+document.getElementById('code').textContent = 'Game Code: '+code;
+const socket = io();
+socket.emit('joinRoom', code);
+
+socket.on('update', game => {
+    render(game);
+});
+
+let timer = null;
+let timeRemaining = 0;
+let currentLevel = 0;
+let blindLevels = [];
+let config = {};
+
+async function fetchGame(){
+    const res = await fetch('/api/game/'+code);
+    const game = await res.json();
+    config = game.config;
+    blindLevels = config.levels;
+    timeRemaining = config.duration;
+    render(game);
+    updateClock();
+}
+
+function updateClock(){
+    const minutes = Math.floor(timeRemaining / 60);
+    const seconds = timeRemaining % 60;
+    document.getElementById('clock').textContent = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+    if(timeRemaining===0){
+        nextLevel();
+    }
+}
+
+function nextLevel(){
+    if(currentLevel < blindLevels.length-1){
+        currentLevel++;
+        timeRemaining = config.duration;
+    }
+}
+
+function startClock(){
+    if(!timer){
+        timer = setInterval(()=>{
+            if(timeRemaining>0){
+                timeRemaining--;
+                updateClock();
+            }else{
+                nextLevel();
+            }
+        },1000);
+    }
+}
+
+function render(game){
+    const table = document.getElementById('players');
+    table.innerHTML = '<tr><th>Seat</th><th>Name</th><th>Status</th><th>Rebuys</th></tr>' +
+        game.players.map(p => `<tr><td>${p.seat}</td><td>${p.name}</td><td>${p.eliminated?'Out':'In'}</td><td>${p.rebuys}</td></tr>`).join('');
+    const pot = (game.players.length * game.config.buyin) + game.players.reduce((s,p)=>s+p.rebuys*game.config.buyin,0);
+    document.getElementById('pot').textContent = 'Total Pot $'+pot;
+}
+
+fetchGame().then(startClock);
+</script>
+</body>
+</html>
