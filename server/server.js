@@ -77,7 +77,16 @@ app.post('/api/login', (req, res) => {
 
 app.post('/api/create', requireAdmin, (req, res) => {
   const code = generateCode();
-  const config = req.body;
+  const cfg = req.body;
+  const config = {
+    stack: Number(cfg.stack) || 0,
+    buyin: Number(cfg.buyin) || 0,
+    rebuyCutoff: Number(cfg.rebuyCutoff) || 0,
+    duration: Number(cfg.duration) || 0,
+    levels: (cfg.levels || []).map(l =>
+      l.break ? { break: Number(l.break) } : { bigBlind: Number(l.bigBlind), littleBlind: Number(l.littleBlind) }
+    )
+  };
   games[code] = { config, players: [], locked: false, history: [], startTime: null, pausedAt: null };
   saveGames();
   res.json({ code });
@@ -158,6 +167,31 @@ app.post('/api/stack/:code/:playerId', requireAdmin, (req, res) => {
   res.json(player);
 });
 
+app.post('/api/levels/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const { levels } = req.body;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  game.config.levels = levels;
+  recordEvent(game, 'Blind levels updated');
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json({ levels });
+});
+
+app.post('/api/insert-break/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const { minutes, index } = req.body;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const idx = typeof index === 'number' ? index : game.config.levels.length;
+  game.config.levels.splice(idx, 0, { break: Number(minutes) || 5 });
+  recordEvent(game, `Inserted ${minutes}m break at level ${idx + 1}`);
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json({ levels: game.config.levels });
+});
+
 app.post('/api/assign-seats/:code', requireAdmin, (req, res) => {
   const { code } = req.params;
   const game = games[code];
@@ -221,8 +255,14 @@ app.post('/api/restart-level/:code', requireAdmin, (req, res) => {
   if (!game.startTime) return res.status(400).json({ error: 'Clock not started' });
   const base = game.pausedAt || Date.now();
   const elapsed = Math.floor((base - game.startTime) / 1000);
-  const level = Math.floor(elapsed / game.config.duration);
-  game.startTime = base - level * game.config.duration * 1000;
+  const durations = game.config.levels.map(l => l.break ? l.break * 60 : game.config.duration);
+  let cum = 0;
+  let level = 0;
+  for (let i = 0; i < durations.length; i++) {
+    if (elapsed < cum + durations[i]) { level = i; break; }
+    cum += durations[i];
+  }
+  game.startTime = base - cum * 1000;
   recordEvent(game, 'Level restarted');
   saveGames();
   io.to(code).emit('start', { startTime: game.startTime });

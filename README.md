@@ -13,6 +13,10 @@ The dev command uses `cross-env` to bind to `0.0.0.0` so the site is reachable f
 
 Open `http://<raspberry-pi>:3000` in your browser to create or join games.
 
+When creating a game you’ll supply a Blind Levels JSON array. Each element can
+be `{"bigBlind":50,"littleBlind":25}` for a normal level or `{"break":10}` to
+represent a 10 minute break.
+
 ### Admin Login
 
 Creating or managing games requires logging in with the admin password `1234`.
@@ -35,6 +39,13 @@ player list so you can review the elimination order at any time.
 Admins can also keep everyone up to date on chip counts. Each player row
 includes an input where the admin can adjust that player’s current stack and the
 changes are broadcast to all connected clients.
+
+Blind levels aren’t set in stone. At the bottom of the game page admins can edit
+the JSON array of levels and save the change at any time. To add a break on the
+fly use the **Add 5m Break**, **Add 10m Break**, or **Add 15m Break** buttons
+which insert a `{ "break": <minutes> }` entry after the current level.
+These break objects can also be included in the levels JSON when creating a
+game.
 
 Use the **Share** button at the bottom of the game page to reveal a QR code for
 that specific game. Both admins and players can display it to quickly share the

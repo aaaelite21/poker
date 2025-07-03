@@ -23,6 +23,16 @@
 <div id="pot"></div>
 <h2>History</h2>
 <ul id="history"></ul>
+<div id="levels-admin" style="display:none">
+    <h2>Blind Levels</h2>
+    <textarea id="levels-json" rows="4" cols="50"></textarea>
+    <button id="save-levels">Save Levels</button>
+    <div class="break-buttons">
+        <button class="break" data-min="5">Add 5m Break</button>
+        <button class="break" data-min="10">Add 10m Break</button>
+        <button class="break" data-min="15">Add 15m Break</button>
+    </div>
+</div>
 <div id="qr-container" style="display:none;text-align:center">
     <img id="qr" alt="QR Code">
 </div>
@@ -42,6 +52,10 @@ const qrImg = document.getElementById('qr');
 const qrContainer = document.getElementById('qr-container');
 const currentEl = document.getElementById('current-level');
 const nextEl = document.getElementById('next-level');
+const levelsDiv = document.getElementById('levels-admin');
+const levelsJson = document.getElementById('levels-json');
+const saveLevelsBtn = document.getElementById('save-levels');
+const breakBtns = document.querySelectorAll('.break');
 
 let timer = null;
 let timeRemaining = 0;
@@ -59,6 +73,7 @@ if(adminToken){
     pauseBtn.style.display = 'inline-block';
     restartBtn.style.display = 'inline-block';
     assignBtn.style.display = 'inline-block';
+    levelsDiv.style.display = 'block';
 }
 function updateButtons(){
     if(!adminToken) return;
@@ -98,6 +113,24 @@ shareBtn.addEventListener('click', () => {
     qrContainer.style.display = qrContainer.style.display === 'none' ? 'block' : 'none';
 });
 
+if(adminToken){
+    saveLevelsBtn.addEventListener('click', async () => {
+        let lvls;
+        try{ lvls = JSON.parse(levelsJson.value); }catch(e){ alert('Invalid JSON'); return; }
+        const res = await fetch('/api/levels/'+code,{method:'POST',headers:{'Content-Type':'application/json','Authorization':adminToken},body:JSON.stringify({levels:lvls})});
+        const out = await res.json();
+        if(out.error) alert(out.error);
+    });
+    breakBtns.forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+            const minutes = Number(btn.dataset.min);
+            const res = await fetch('/api/insert-break/'+code,{method:'POST',headers:{'Content-Type':'application/json','Authorization':adminToken},body:JSON.stringify({minutes,index:currentLevel+1})});
+            const out = await res.json();
+            if(out.error) alert(out.error);
+        });
+    });
+}
+
 document.getElementById('code').textContent = 'Game Code: '+code;
 const socket = io();
 socket.emit('joinRoom', code);
@@ -133,7 +166,8 @@ async function fetchGame(){
     if(startTime){
         computeTime();
     }else{
-        timeRemaining = config.duration;
+        const first = blindLevels[0];
+        timeRemaining = first ? (first.break?first.break*60:config.duration) : config.duration;
     }
     render(game);
     updateClock();
@@ -147,8 +181,10 @@ function updateClock(){
     if(blindLevels.length){
         const cur = blindLevels[currentLevel] || {};
         const next = blindLevels[currentLevel+1] || {};
-        currentEl.textContent = cur.bigBlind ? `${cur.bigBlind}/${cur.littleBlind}` : 'N/A';
-        nextEl.textContent = next.bigBlind ? `${next.bigBlind}/${next.littleBlind}` : 'N/A';
+        currentEl.textContent = cur.break ? `Break ${cur.break}m` :
+            cur.bigBlind ? `${cur.bigBlind}/${cur.littleBlind}` : 'N/A';
+        nextEl.textContent = next.break ? `Break ${next.break}m` :
+            next.bigBlind ? `${next.bigBlind}/${next.littleBlind}` : 'N/A';
     }
 }
 
@@ -156,16 +192,25 @@ function computeTime(){
     if(startTime!==null){
         const now = pausedAt || Date.now();
         const elapsed = Math.floor((now - startTime)/1000);
-        currentLevel = Math.floor(elapsed / config.duration);
-        if(currentLevel >= blindLevels.length) currentLevel = blindLevels.length-1;
-        timeRemaining = config.duration - (elapsed % config.duration);
+        const durations = blindLevels.map(l => l.break ? l.break*60 : config.duration);
+        let cum = 0;
+        currentLevel = 0;
+        for(let i=0;i<durations.length;i++){
+            if(elapsed < cum + durations[i]){ currentLevel=i; timeRemaining = cum + durations[i] - elapsed; break; }
+            cum += durations[i];
+        }
+        if(elapsed >= cum + (durations[currentLevel]||0)){
+            currentLevel = durations.length-1;
+            timeRemaining = 0;
+        }
     }
 }
 
 function nextLevel(){
     if(currentLevel < blindLevels.length-1){
         currentLevel++;
-        timeRemaining = config.duration;
+        const lvl = blindLevels[currentLevel];
+        timeRemaining = lvl ? (lvl.break?lvl.break*60:config.duration) : config.duration;
     }
 }
 
@@ -221,6 +266,9 @@ function render(game){
         return `<li>${t} - ${h.msg}</li>`;
     }).join('');
     document.getElementById('history').innerHTML = historyList;
+    if(adminToken){
+        levelsJson.value = JSON.stringify(game.config.levels, null, 2);
+    }
 }
 
 fetchGame().then(() => { if(startTime) startClock(); });
