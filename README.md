@@ -26,10 +26,10 @@ game view using the **Start Clock** button. All connected players will see the
 same timer once started.
 
 When viewing a game as the admin, a QR code is displayed so you can easily share
-the site's URL with players.
-If you access the admin page using `localhost`, set the `PUBLIC_URL` environment
-variable when starting the server so the QR code points to the correct network
-address, e.g. `PUBLIC_URL=http://192.168.1.10:3000 npm run dev`.
+the site's URL with players. By default the server detects its local IP address
+and uses that in the QR code. If detection fails or you want to override the
+address, set the `PUBLIC_URL` environment variable when starting the server,
+e.g. `PUBLIC_URL=http://192.168.1.10:3000 npm run dev`.
 
 ### Exposing on port 80
 
