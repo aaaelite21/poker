@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Poker Tournament</title>
+</head>
+<body>
+<h1>Create Game</h1>
+<form id="create-form">
+    <label>Starting Stack<input name="stack" type="number" required></label><br>
+    <label>Buy-In USD<input name="buyin" type="number" required></label><br>
+    <label>Rebuy Cutoff Level<input name="rebuyCutoff" type="number" required></label><br>
+    <label>Level Duration (seconds)<input name="duration" type="number" value="900"></label><br>
+    <label>Blind Levels JSON<textarea name="levels" rows="4" cols="50">[{"bigBlind":5,"littleBlind":2}]</textarea></label><br>
+    <button type="submit">Create</button>
+</form>
+
+<h1>Join Game</h1>
+<form id="join-form">
+    <label>Code<input name="code" required></label>
+    <label>Name<input name="name" required></label>
+    <button type="submit">Join</button>
+</form>
+
+<div id="result"></div>
+<h1>Available Games</h1>
+<ul id="games"></ul>
+<script>
+const createForm = document.getElementById('create-form');
+createForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(createForm));
+    data.levels = JSON.parse(data.levels);
+    const res = await fetch('/api/create', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    const out = await res.json();
+    document.getElementById('result').textContent = 'Game code: '+out.code;
+});
+
+const joinForm = document.getElementById('join-form');
+joinForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(joinForm));
+    const res = await fetch('/api/join/'+data.code,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:data.name})});
+    const out = await res.json();
+    if(out.error){ alert(out.error); return; }
+    window.location='game.html?code='+data.code+'&player='+out.id;
+});
+
+async function loadGames(){
+    const res = await fetch('/api/games');
+    const games = await res.json();
+    const list = document.getElementById('games');
+    list.innerHTML = games.map(g =>
+        `<li>${g.code} - ${g.players} player${g.players===1?'':'s'}`+
+        ` <a href="game.html?code=${g.code}">View</a></li>`).join('');
+}
+
+loadGames();
+</script>
+</body>
+</html>
