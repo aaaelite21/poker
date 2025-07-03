@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-The dev command binds to `0.0.0.0` so the site is reachable from other devices on your network.
+The dev command uses `cross-env` to bind to `0.0.0.0` so the site is reachable from other devices on your network, even on Windows.
 
 Open `http://<raspberry-pi>:3000` in your browser to create or join games.
 
