@@ -83,7 +83,9 @@ const joinForm = document.getElementById('join-form');
 joinForm.addEventListener('submit', async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(joinForm));
-    const res = await fetch('/api/join/'+data.code,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:data.name})});
+    const headers = {'Content-Type':'application/json'};
+    if(adminToken) headers['Authorization'] = adminToken;
+    const res = await fetch('/api/join/'+data.code,{method:'POST',headers,body:JSON.stringify({name:data.name})});
     const out = await res.json();
     if(out.error){ alert(out.error); return; }
     window.location='game.html?code='+data.code+'&player='+out.id;
