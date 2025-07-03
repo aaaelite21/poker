@@ -29,6 +29,9 @@ mark themselves busted from the game view and the admin can do it for them if
 they forget. Once registration is complete the admin can randomize seats using
 **Assign Seats** and those seat numbers appear on everyone’s screen.
 
+Every seat assignment or bust-out is recorded in a history log shown below the
+player list so you can review the elimination order at any time.
+
 Use the **Share** button at the bottom of the game page to reveal a QR code for
 that specific game. Both admins and players can display it to quickly share the
 link. By default the server detects its local IP address and uses that in the

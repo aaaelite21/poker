@@ -56,6 +56,10 @@ function generateCode() {
   return code;
 }
 
+function recordEvent(game, msg) {
+  game.history.push({ time: Date.now(), msg });
+}
+
 function requireAdmin(req, res, next) {
   const token = req.headers.authorization;
   if (!token || token !== adminToken) {
@@ -90,6 +94,7 @@ app.post('/api/join/:code', (req, res) => {
   if (game.locked) return res.status(403).json({ error: 'Game locked' });
   const player = { id: uuidv4(), name, seat: null, busted: false, rebuys: 0 };
   game.players.push(player);
+  recordEvent(game, `${name} joined`);
   saveGames();
   io.to(code).emit('update', game);
   res.json(player);
@@ -114,6 +119,7 @@ app.post('/api/eliminate/:code/:playerId', requireAdmin, (req, res) => {
   if (!player) return res.status(404).json({ error: 'Player not found' });
   player.busted = true;
   if (rebuy) player.rebuys += 1;
+  recordEvent(game, `${player.name} busted${rebuy ? ' and rebuys' : ''}`);
   saveGames();
   io.to(code).emit('update', game);
   res.json(player);
@@ -130,6 +136,7 @@ app.post('/api/bust/:code/:playerId', (req, res) => {
   if (!player) return res.status(404).json({ error: 'Player not found' });
   if (token === adminToken || pid === playerId) {
     player.busted = !!busted;
+    recordEvent(game, `${player.name} ${player.busted ? 'busted' : 'returned'}`);
     saveGames();
     io.to(code).emit('update', game);
     return res.json(player);
@@ -150,6 +157,8 @@ app.post('/api/assign-seats/:code', requireAdmin, (req, res) => {
     p.seat = idx + 1;
   });
   game.players = players;
+  recordEvent(game, 'Seats assigned');
+  players.forEach(p => recordEvent(game, `Seat ${p.seat}: ${p.name}`));
   saveGames();
   io.to(code).emit('update', game);
   res.json({ assigned: true });
@@ -161,10 +170,12 @@ app.post('/api/start/:code', requireAdmin, (req, res) => {
   if (!game) return res.status(404).json({ error: 'Game not found' });
   if (!game.startTime) {
     game.startTime = Date.now();
+    recordEvent(game, 'Clock started');
   } else if (game.pausedAt) {
     const paused = Date.now() - game.pausedAt;
     game.startTime += paused;
     game.pausedAt = null;
+    recordEvent(game, 'Clock resumed');
   } else {
     return res.status(400).json({ error: 'Clock already started' });
   }
@@ -182,6 +193,7 @@ app.post('/api/pause/:code', requireAdmin, (req, res) => {
     return res.status(400).json({ error: 'Clock not running' });
   }
   game.pausedAt = Date.now();
+  recordEvent(game, 'Clock paused');
   saveGames();
   io.to(code).emit('pause', { pausedAt: game.pausedAt });
   io.to(code).emit('update', game);
@@ -197,6 +209,7 @@ app.post('/api/restart-level/:code', requireAdmin, (req, res) => {
   const elapsed = Math.floor((base - game.startTime) / 1000);
   const level = Math.floor(elapsed / game.config.duration);
   game.startTime = base - level * game.config.duration * 1000;
+  recordEvent(game, 'Level restarted');
   saveGames();
   io.to(code).emit('start', { startTime: game.startTime });
   io.to(code).emit('update', game);

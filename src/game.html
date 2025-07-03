@@ -21,6 +21,8 @@
 </div>
 <table id="players"></table>
 <div id="pot"></div>
+<h2>History</h2>
+<ul id="history"></ul>
 <div id="qr-container" style="display:none;text-align:center">
     <img id="qr" alt="QR Code">
 </div>
@@ -202,6 +204,11 @@ function render(game){
     });
     const pot = (game.players.length * game.config.buyin) + game.players.reduce((s,p)=>s+p.rebuys*game.config.buyin,0);
     document.getElementById('pot').textContent = 'Total Pot $'+pot;
+    const historyList = game.history.map(h => {
+        const t = new Date(h.time).toLocaleTimeString();
+        return `<li>${t} - ${h.msg}</li>`;
+    }).join('');
+    document.getElementById('history').innerHTML = historyList;
 }
 
 fetchGame().then(() => { if(startTime) startClock(); });
