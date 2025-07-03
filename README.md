@@ -29,9 +29,10 @@ mark themselves busted from the game view and the admin can do it for them if
 they forget. Once registration is complete the admin can randomize seats using
 **Assign Seats** and those seat numbers appear on everyone’s screen.
 
-When viewing a game as the admin, use the **Share** button at the bottom of the
-page to reveal a QR code for that specific game. By default the server detects
-its local IP address and uses that in the QR code. If detection fails or you
+Use the **Share** button at the bottom of the game page to reveal a QR code for
+that specific game. Both admins and players can display it to quickly share the
+link. By default the server detects its local IP address and uses that in the
+QR code. If detection fails or you
 want to override the address, set the `PUBLIC_URL` environment variable when
 starting the server, e.g. `PUBLIC_URL=http://192.168.1.10:3000 npm run dev`.
 

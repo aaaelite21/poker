@@ -48,15 +48,15 @@ let blindLevels = [];
 let config = {};
 let startTime = null;
 let pausedAt = null;
+const base = window.PUBLIC_URL || window.location.origin;
+qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' +
+    encodeURIComponent(base + '/game.html?code=' + code);
+shareBtn.style.display = 'inline-block';
 if(adminToken){
     startBtn.style.display = 'inline-block';
     pauseBtn.style.display = 'inline-block';
     restartBtn.style.display = 'inline-block';
     assignBtn.style.display = 'inline-block';
-    shareBtn.style.display = 'inline-block';
-    const base = window.PUBLIC_URL || window.location.origin;
-    qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+
-        encodeURIComponent(base + '/game.html?code=' + code);
 }
 function updateButtons(){
     if(!adminToken) return;
