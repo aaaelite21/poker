@@ -99,9 +99,19 @@ createForm.addEventListener('submit', async e => {
     data.levels = JSON.parse(data.levels);
     data.stack = Number(data.stack);
     if(!adminToken){ alert('Admin login required'); return; }
-    const res = await fetch('/api/create', {method:'POST',headers:{'Content-Type':'application/json','Authorization':adminToken},body:JSON.stringify(data)});
+    const res = await fetch('/api/create', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':adminToken},
+        body:JSON.stringify(data)
+    });
     const out = await res.json();
-    document.getElementById('result').textContent = 'Game code: '+out.code;
+    if(out.code){
+        document.getElementById('result').textContent = 'Game code: '+out.code;
+    }else if(out.error){
+        document.getElementById('result').textContent = out.error;
+    }else{
+        document.getElementById('result').textContent = 'Failed to create game';
+    }
 });
 
 const joinForm = document.getElementById('join-form');
