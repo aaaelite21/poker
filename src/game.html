@@ -12,6 +12,7 @@
 <img id="qr" style="display:none" alt="QR Code">
 <table id="players"></table>
 <div id="pot"></div>
+<script src="config.js"></script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
 const url = new URL(window.location);
@@ -23,8 +24,9 @@ const qrImg = document.getElementById('qr');
 if(adminToken){
     startBtn.style.display = 'block';
     qrImg.style.display = 'block';
+    const base = window.PUBLIC_URL || window.location.origin;
     qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+
-        encodeURIComponent(window.location.origin);
+        encodeURIComponent(base);
 }
 startBtn.addEventListener('click', async () => {
     const res = await fetch('/api/start/'+code,{method:'POST',headers:{'Authorization':adminToken}});

@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const ADMIN_PASSWORD = '1234';
 let adminToken = null;
+const PUBLIC_URL = process.env.PUBLIC_URL || '';
 
 const app = express();
 const httpServer = createServer(app);
@@ -14,6 +15,10 @@ const io = new Server(httpServer, { cors: { origin: '*' } });
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../src')));
+app.get('/config.js', (req, res) => {
+  res.type('application/javascript');
+  res.send(`window.PUBLIC_URL=${JSON.stringify(PUBLIC_URL)};`);
+});
 
 const DATA_FILE = path.join(__dirname, 'games.json');
 let games = {};
