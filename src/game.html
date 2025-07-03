@@ -40,6 +40,14 @@ const qrImg = document.getElementById('qr');
 const qrContainer = document.getElementById('qr-container');
 const currentEl = document.getElementById('current-level');
 const nextEl = document.getElementById('next-level');
+
+let timer = null;
+let timeRemaining = 0;
+let currentLevel = 0;
+let blindLevels = [];
+let config = {};
+let startTime = null;
+let pausedAt = null;
 if(adminToken){
     startBtn.style.display = 'inline-block';
     pauseBtn.style.display = 'inline-block';
@@ -112,14 +120,6 @@ socket.on('pause', data => {
     }
     updateButtons();
 });
-
-let timer = null;
-let timeRemaining = 0;
-let currentLevel = 0;
-let blindLevels = [];
-let config = {};
-let startTime = null;
-let pausedAt = null;
 
 async function fetchGame(){
     const res = await fetch('/api/game/'+code);
