@@ -11,6 +11,11 @@ node server.js
 
 Open `http://<raspberry-pi>:3000` in your browser to create or join games.
 
+### Admin Login
+
+Creating or managing games requires logging in with the admin password `1234`.
+Use the login form on the main page to obtain a token before creating games.
+
 ### Exposing on port 80
 
 To use the site with just the Pi's host name (no `:3000` suffix), run the

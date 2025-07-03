@@ -5,6 +5,9 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
+const ADMIN_PASSWORD = '1234';
+let adminToken = null;
+
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: '*' } });
@@ -32,7 +35,22 @@ function generateCode() {
   return code;
 }
 
-app.post('/api/create', (req, res) => {
+function requireAdmin(req, res, next) {
+  const token = req.headers.authorization;
+  if (!token || token !== adminToken) {
+    return res.status(403).json({ error: 'Admin authentication required' });
+  }
+  next();
+}
+
+app.post('/api/login', (req, res) => {
+  const { password } = req.body;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Invalid password' });
+  adminToken = uuidv4();
+  res.json({ token: adminToken });
+});
+
+app.post('/api/create', requireAdmin, (req, res) => {
   const code = generateCode();
   const config = req.body;
   games[code] = { config, players: [], locked: false, history: [] };
@@ -41,6 +59,9 @@ app.post('/api/create', (req, res) => {
 });
 
 app.post('/api/join/:code', (req, res) => {
+  if (req.headers.authorization && req.headers.authorization === adminToken) {
+    return res.status(403).json({ error: 'Admin account cannot join games' });
+  }
   const { code } = req.params;
   const { name } = req.body;
   const game = games[code];
@@ -54,7 +75,7 @@ app.post('/api/join/:code', (req, res) => {
   res.json(player);
 });
 
-app.post('/api/lock/:code', (req, res) => {
+app.post('/api/lock/:code', requireAdmin, (req, res) => {
   const { code } = req.params;
   const game = games[code];
   if (!game) return res.status(404).json({ error: 'Game not found' });
@@ -64,7 +85,7 @@ app.post('/api/lock/:code', (req, res) => {
   res.json({ locked: true });
 });
 
-app.post('/api/eliminate/:code/:playerId', (req, res) => {
+app.post('/api/eliminate/:code/:playerId', requireAdmin, (req, res) => {
   const { code, playerId } = req.params;
   const { rebuy } = req.body;
   const game = games[code];
