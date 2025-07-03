@@ -14,6 +14,7 @@
     <button type="submit">Login</button>
 </form>
 <div id="login-status" class="result"></div>
+<div id="create-section">
 <h1>Create Game</h1>
 <form id="create-form">
     <label>Starting Stack
@@ -33,7 +34,9 @@
     </label>
     <button type="submit">Create</button>
 </form>
+</div>
 
+<div id="join-section">
 <h1>Join Game</h1>
 <form id="join-form">
     <label>Code
@@ -44,6 +47,7 @@
     </label>
     <button type="submit">Join</button>
 </form>
+</div>
 
 <div id="result" class="result"></div>
 <h1>Available Games</h1>
@@ -56,6 +60,12 @@ let adminToken = localStorage.getItem('adminToken');
 if(adminToken){
     loginStatus.textContent = 'Logged in';
 }
+function updateVisibility(){
+    const loggedIn = !!adminToken;
+    document.getElementById('create-section').style.display = loggedIn ? 'block' : 'none';
+    document.getElementById('join-section').style.display = loggedIn ? 'none' : 'block';
+}
+updateVisibility();
 loginForm.addEventListener('submit', async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(loginForm));
@@ -65,6 +75,7 @@ loginForm.addEventListener('submit', async e => {
         adminToken = out.token;
         localStorage.setItem('adminToken', adminToken);
         loginStatus.textContent = 'Logged in';
+        updateVisibility();
     } else if(out.error){
         alert(out.error);
     }
