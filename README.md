@@ -21,6 +21,9 @@ represent a 10 minute break.
 
 Creating or managing games requires logging in with the admin password `1234`.
 Use the login form on the main page to obtain a token before creating games.
+Non‑admins only see the join form and list of games; the Create and Delete
+buttons appear once you log in. Use the Logout button to return to the regular
+view on shared devices.
 
 ### Game Management
 

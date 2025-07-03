@@ -14,6 +14,7 @@
     <button type="submit">Login</button>
 </form>
 <div id="login-status" class="result"></div>
+<button id="logout-btn" style="display:none">Logout</button>
 <div id="create-section" style="display:none">
 <h1>Create Game</h1>
 <form id="create-form">
@@ -56,12 +57,15 @@
 <script>
 const loginForm = document.getElementById('login-form');
 const loginStatus = document.getElementById('login-status');
+const logoutBtn = document.getElementById('logout-btn');
 let adminToken = localStorage.getItem('adminToken');
 if(adminToken){
     loginStatus.textContent = 'Logged in';
 }
 function updateVisibility(){
     const loggedIn = !!adminToken;
+    document.getElementById('login-form').style.display = loggedIn ? 'none' : 'block';
+    logoutBtn.style.display = loggedIn ? 'inline-block' : 'none';
     document.getElementById('create-section').style.display = loggedIn ? 'block' : 'none';
     document.getElementById('join-section').style.display = loggedIn ? 'none' : 'block';
 }
@@ -76,9 +80,17 @@ loginForm.addEventListener('submit', async e => {
         localStorage.setItem('adminToken', adminToken);
         loginStatus.textContent = 'Logged in';
         updateVisibility();
+        loadGames();
     } else if(out.error){
         alert(out.error);
     }
+});
+logoutBtn.addEventListener('click', () => {
+    adminToken = null;
+    localStorage.removeItem('adminToken');
+    loginStatus.textContent = '';
+    updateVisibility();
+    loadGames();
 });
 const createForm = document.getElementById('create-form');
 createForm.addEventListener('submit', async e => {
