@@ -119,6 +119,16 @@ app.post('/api/lock/:code', requireAdmin, (req, res) => {
   res.json({ locked: true });
 });
 
+app.post('/api/unlock/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  game.locked = false;
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json({ locked: false });
+});
+
 app.post('/api/eliminate/:code/:playerId', requireAdmin, (req, res) => {
   const { code, playerId } = req.params;
   const { rebuy } = req.body;
@@ -286,13 +296,15 @@ app.get('/api/game/:code', (req, res) => {
 });
 
 app.get('/api/games', (req, res) => {
-  const available = Object.entries(games)
-    .filter(([, game]) => !game.locked)
+  const isAdmin = req.headers.authorization && req.headers.authorization === adminToken;
+  const list = Object.entries(games)
+    .filter(([, game]) => isAdmin || !game.locked)
     .map(([code, game]) => ({
       code,
       players: game.players.length,
+      locked: game.locked,
     }));
-  res.json(available);
+  res.json(list);
 });
 
 io.on('connection', socket => {

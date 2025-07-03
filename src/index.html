@@ -117,17 +117,30 @@ joinForm.addEventListener('submit', async e => {
 });
 
 async function loadGames(){
-    const res = await fetch('/api/games');
+    const headers = {};
+    if(adminToken) headers['Authorization'] = adminToken;
+    const res = await fetch('/api/games',{headers});
     const games = await res.json();
     const list = document.getElementById('games');
-    list.innerHTML = games.map(g =>
-        `<li>${g.code} - ${g.players} player${g.players===1?'':'s'} `+
-        `<a href="game.html?code=${g.code}">View</a>`+
-        `${adminToken?` <button class="delete" data-code="${g.code}">Delete</button>`:''}</li>`).join('');
+    list.innerHTML = games.map(g => {
+        const view = `<a href="game.html?code=${g.code}">View</a>`;
+        const del = adminToken ? ` <button class="delete" data-code="${g.code}">Delete</button>` : '';
+        const lock = adminToken ? ` <button class="lock" data-code="${g.code}" data-locked="${g.locked}">${g.locked?'Unlock':'Lock'}</button>` : '';
+        return `<li>${g.code} - ${g.players} player${g.players===1?'':'s'} ${view}${lock}${del}</li>`;
+    }).join('');
     if(adminToken){
         list.querySelectorAll('.delete').forEach(btn=>{
             btn.addEventListener('click', async ()=>{
                 await fetch('/api/game/'+btn.dataset.code,{method:'DELETE',headers:{'Authorization':adminToken}});
+                loadGames();
+            });
+        });
+        list.querySelectorAll('.lock').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+                const code = btn.dataset.code;
+                const locked = btn.dataset.locked === 'true';
+                const endpoint = locked ? '/api/unlock/' : '/api/lock/';
+                await fetch(endpoint+code,{method:'POST',headers:{'Authorization':adminToken}});
                 loadGames();
             });
         });

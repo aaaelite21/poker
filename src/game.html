@@ -7,12 +7,20 @@
 </head>
 <body>
 <h1 id="code"></h1>
+<form id="join-form" style="display:none">
+    <label>Name
+        <input name="name" required>
+    </label>
+    <button type="submit">Join Game</button>
+</form>
+<div id="lock-msg" class="result" style="display:none"></div>
 <div id="clock">00:00</div>
 <div class="action-buttons">
     <button id="start-btn" style="display:none">Start Clock</button>
     <button id="pause-btn" style="display:none">Pause Clock</button>
     <button id="restart-btn" style="display:none">Restart Level</button>
     <button id="assign-btn" style="display:none">Assign Seats</button>
+    <button id="lock-btn" style="display:none">Lock Game</button>
     <button id="share-btn" style="display:none">Share</button>
 </div>
 <div id="level-info" style="text-align:center;margin-bottom:10px">
@@ -47,6 +55,7 @@ const startBtn = document.getElementById('start-btn');
 const pauseBtn = document.getElementById('pause-btn');
 const restartBtn = document.getElementById('restart-btn');
 const assignBtn = document.getElementById('assign-btn');
+const lockBtn = document.getElementById('lock-btn');
 const shareBtn = document.getElementById('share-btn');
 const qrImg = document.getElementById('qr');
 const qrContainer = document.getElementById('qr-container');
@@ -56,6 +65,8 @@ const levelsDiv = document.getElementById('levels-admin');
 const levelsJson = document.getElementById('levels-json');
 const saveLevelsBtn = document.getElementById('save-levels');
 const breakBtns = document.querySelectorAll('.break');
+const joinForm = document.getElementById('join-form');
+const lockMsg = document.getElementById('lock-msg');
 
 let timer = null;
 let timeRemaining = 0;
@@ -73,6 +84,7 @@ if(adminToken){
     pauseBtn.style.display = 'inline-block';
     restartBtn.style.display = 'inline-block';
     assignBtn.style.display = 'inline-block';
+    lockBtn.style.display = 'inline-block';
     levelsDiv.style.display = 'block';
 }
 function updateButtons(){
@@ -109,6 +121,14 @@ assignBtn.addEventListener('click', async () => {
     if(out.error) alert(out.error);
 });
 
+lockBtn.addEventListener('click', async () => {
+    const locked = lockBtn.textContent.startsWith('Unlock');
+    const endpoint = locked ? '/api/unlock/' : '/api/lock/';
+    const res = await fetch(endpoint+code,{method:'POST',headers:{'Authorization':adminToken}});
+    const out = await res.json();
+    if(out.error) alert(out.error);
+});
+
 shareBtn.addEventListener('click', () => {
     qrContainer.style.display = qrContainer.style.display === 'none' ? 'block' : 'none';
 });
@@ -128,6 +148,17 @@ if(adminToken){
             const out = await res.json();
             if(out.error) alert(out.error);
         });
+    });
+}
+
+if(!adminToken && !playerId){
+    joinForm.addEventListener('submit', async e => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(joinForm));
+        const res = await fetch('/api/join/'+code,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:data.name})});
+        const out = await res.json();
+        if(out.error){ alert(out.error); return; }
+        window.location = 'game.html?code='+code+'&player='+out.id;
     });
 }
 
@@ -172,6 +203,22 @@ async function fetchGame(){
     render(game);
     updateClock();
     updateButtons();
+    if(adminToken){
+        lockBtn.textContent = game.locked ? 'Unlock Game' : 'Lock Game';
+    }
+    if(!adminToken && !playerId){
+        if(game.locked){
+            joinForm.style.display = 'none';
+            lockMsg.textContent = 'Game is locked';
+            lockMsg.style.display = 'block';
+        }else{
+            lockMsg.style.display = 'none';
+            joinForm.style.display = 'block';
+        }
+    }else{
+        joinForm.style.display = 'none';
+        lockMsg.style.display = 'none';
+    }
 }
 
 function updateClock(){
@@ -268,6 +315,7 @@ function render(game){
     document.getElementById('history').innerHTML = historyList;
     if(adminToken){
         levelsJson.value = JSON.stringify(game.config.levels, null, 2);
+        lockBtn.textContent = game.locked ? 'Unlock Game' : 'Lock Game';
     }
 }
 
