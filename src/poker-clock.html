@@ -72,6 +72,34 @@
             justify-content: center;
         }
 
+        #admin-controls {
+            display: none;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        #login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        #login-screen input {
+            margin: 5px 0;
+            padding: 10px;
+            font-size: 1rem;
+        }
+
         #progress-bar {
             width: 100%;
             background: #444;
@@ -120,6 +148,13 @@
 </head>
 
 <body>
+    <div id="login-screen">
+        <h2>Admin Login</h2>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+        <button onclick="continueAsPlayer()">Continue as Player</button>
+    </div>
     <div id="progress-bar">
         <div id="progress"></div>
     </div>
@@ -133,9 +168,11 @@
     <div id="controls">
         <button onclick="startClock()">Start</button>
         <button onclick="pauseClock()">Pause</button>
-        <button onclick="resetClock()">Reset</button>
     </div>
-    <button onclick="showCustomLevels()">Edit Blind Levels</button>
+    <div id="admin-controls">
+        <button onclick="resetClock()">New Game</button>
+        <button onclick="showCustomLevels()">Edit Blind Levels</button>
+    </div>
     <div id="custom-levels">
         <textarea id="blind-data" rows="10" cols="30"></textarea>
         <button onclick="applyCustomLevels()">Apply</button>
@@ -145,6 +182,34 @@
         let timer = null;
         let timeRemaining = 900; // 15 minutes in seconds
         let currentLevel = 0;
+        let isAdmin = false;
+
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            if (username === 'admin' && password === '1234') {
+                isAdmin = true;
+                document.getElementById('login-screen').style.display = 'none';
+                showAdminControls();
+            } else {
+                alert('Invalid credentials');
+            }
+        }
+
+        function continueAsPlayer() {
+            document.getElementById('login-screen').style.display = 'none';
+            hideAdminControls();
+        }
+
+        function showAdminControls() {
+            document.getElementById('admin-controls').style.display = 'flex';
+            document.getElementById('controls').style.display = 'none';
+        }
+
+        function hideAdminControls() {
+            document.getElementById('admin-controls').style.display = 'none';
+            document.getElementById('controls').style.display = 'flex';
+        }
 
         const blindLevels = [
             { bigBlind: 5, littleBlind: 2 },
@@ -269,6 +334,7 @@
         updateClock();
         updateBlinds();
         updateProgressBar();
+        hideAdminControls();
     </script>
 </body>
 
