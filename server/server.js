@@ -88,8 +88,7 @@ app.post('/api/join/:code', (req, res) => {
   const game = games[code];
   if (!game) return res.status(404).json({ error: 'Game not found' });
   if (game.locked) return res.status(403).json({ error: 'Game locked' });
-  const seat = game.players.length + 1;
-  const player = { id: uuidv4(), name, seat, eliminated: false, rebuys: 0 };
+  const player = { id: uuidv4(), name, seat: null, busted: false, rebuys: 0 };
   game.players.push(player);
   saveGames();
   io.to(code).emit('update', game);
@@ -113,11 +112,47 @@ app.post('/api/eliminate/:code/:playerId', requireAdmin, (req, res) => {
   if (!game) return res.status(404).json({ error: 'Game not found' });
   const player = game.players.find(p => p.id === playerId);
   if (!player) return res.status(404).json({ error: 'Player not found' });
-  player.eliminated = true;
+  player.busted = true;
   if (rebuy) player.rebuys += 1;
   saveGames();
   io.to(code).emit('update', game);
   res.json(player);
+});
+
+app.post('/api/bust/:code/:playerId', (req, res) => {
+  const { code, playerId } = req.params;
+  const { busted } = req.body;
+  const token = req.headers.authorization;
+  const pid = req.headers['player-id'];
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const player = game.players.find(p => p.id === playerId);
+  if (!player) return res.status(404).json({ error: 'Player not found' });
+  if (token === adminToken || pid === playerId) {
+    player.busted = !!busted;
+    saveGames();
+    io.to(code).emit('update', game);
+    return res.json(player);
+  }
+  res.status(403).json({ error: 'Not allowed' });
+});
+
+app.post('/api/assign-seats/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const players = game.players.slice();
+  for (let i = players.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [players[i], players[j]] = [players[j], players[i]];
+  }
+  players.forEach((p, idx) => {
+    p.seat = idx + 1;
+  });
+  game.players = players;
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json({ assigned: true });
 });
 
 app.post('/api/start/:code', requireAdmin, (req, res) => {
@@ -164,6 +199,11 @@ io.on('connection', socket => {
       socket.emit('update', game);
       if (game.startTime) socket.emit('start', { startTime: game.startTime });
     }
+    const interval = setInterval(() => {
+      const g = games[code];
+      if (g) socket.emit('update', g);
+    }, 10000);
+    socket.on('disconnect', () => clearInterval(interval));
   });
 });
 
