@@ -74,7 +74,7 @@ app.post('/api/login', (req, res) => {
 app.post('/api/create', requireAdmin, (req, res) => {
   const code = generateCode();
   const config = req.body;
-  games[code] = { config, players: [], locked: false, history: [], startTime: null };
+  games[code] = { config, players: [], locked: false, history: [], startTime: null, pausedAt: null };
   saveGames();
   res.json({ code });
 });
@@ -159,10 +159,47 @@ app.post('/api/start/:code', requireAdmin, (req, res) => {
   const { code } = req.params;
   const game = games[code];
   if (!game) return res.status(404).json({ error: 'Game not found' });
-  if (game.startTime) return res.status(400).json({ error: 'Clock already started' });
-  game.startTime = Date.now();
+  if (!game.startTime) {
+    game.startTime = Date.now();
+  } else if (game.pausedAt) {
+    const paused = Date.now() - game.pausedAt;
+    game.startTime += paused;
+    game.pausedAt = null;
+  } else {
+    return res.status(400).json({ error: 'Clock already started' });
+  }
   saveGames();
   io.to(code).emit('start', { startTime: game.startTime });
+  io.to(code).emit('update', game);
+  res.json({ startTime: game.startTime });
+});
+
+app.post('/api/pause/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  if (!game.startTime || game.pausedAt) {
+    return res.status(400).json({ error: 'Clock not running' });
+  }
+  game.pausedAt = Date.now();
+  saveGames();
+  io.to(code).emit('pause', { pausedAt: game.pausedAt });
+  io.to(code).emit('update', game);
+  res.json({ pausedAt: game.pausedAt });
+});
+
+app.post('/api/restart-level/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  if (!game.startTime) return res.status(400).json({ error: 'Clock not started' });
+  const base = game.pausedAt || Date.now();
+  const elapsed = Math.floor((base - game.startTime) / 1000);
+  const level = Math.floor(elapsed / game.config.duration);
+  game.startTime = base - level * game.config.duration * 1000;
+  saveGames();
+  io.to(code).emit('start', { startTime: game.startTime });
+  io.to(code).emit('update', game);
   res.json({ startTime: game.startTime });
 });
 
@@ -198,6 +235,7 @@ io.on('connection', socket => {
     if (game) {
       socket.emit('update', game);
       if (game.startTime) socket.emit('start', { startTime: game.startTime });
+      if (game.pausedAt) socket.emit('pause', { pausedAt: game.pausedAt });
     }
     const interval = setInterval(() => {
       const g = games[code];

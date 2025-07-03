@@ -21,12 +21,13 @@ Use the login form on the main page to obtain a token before creating games.
 ### Game Management
 
 Admins can delete finished games using the Delete buttons shown next to each game
-in the lobby. A shared tournament clock is also controlled by the admin from the
-game view using the **Start Clock** button. All connected players will see the
-same timer once started. Players can mark themselves busted from the game view
-and the admin can do it for them if they forget. Once registration is complete
-the admin can randomize seats using **Assign Seats** and those seat numbers
-appear on everyone’s screen.
+in the lobby. A shared tournament clock is controlled by the admin from the game
+view. Use **Start Clock** to begin or resume the timer, **Pause Clock** to pause
+it and **Restart Level** to reset the current level. The interface also shows the
+current blind level and the next one so players know what’s coming. Players can
+mark themselves busted from the game view and the admin can do it for them if
+they forget. Once registration is complete the admin can randomize seats using
+**Assign Seats** and those seat numbers appear on everyone’s screen.
 
 When viewing a game as the admin, use the **Share** button at the bottom of the
 page to reveal a QR code for that specific game. By default the server detects
