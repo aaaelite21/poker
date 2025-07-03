@@ -8,11 +8,16 @@
 <body>
 <h1 id="code"></h1>
 <div id="clock">00:00</div>
-<button id="start-btn" style="display:none">Start Clock</button>
-<button id="assign-btn" style="display:none">Assign Seats</button>
-<img id="qr" style="display:none" alt="QR Code">
+<div class="action-buttons">
+    <button id="start-btn" style="display:none">Start Clock</button>
+    <button id="assign-btn" style="display:none">Assign Seats</button>
+    <button id="share-btn" style="display:none">Share</button>
+</div>
 <table id="players"></table>
 <div id="pot"></div>
+<div id="qr-container" style="display:none;text-align:center">
+    <img id="qr" alt="QR Code">
+</div>
 <script src="config.js"></script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
@@ -22,14 +27,16 @@ const playerId = url.searchParams.get('player');
 const adminToken = localStorage.getItem('adminToken');
 const startBtn = document.getElementById('start-btn');
 const assignBtn = document.getElementById('assign-btn');
+const shareBtn = document.getElementById('share-btn');
 const qrImg = document.getElementById('qr');
+const qrContainer = document.getElementById('qr-container');
 if(adminToken){
-    startBtn.style.display = 'block';
-    assignBtn.style.display = 'block';
-    qrImg.style.display = 'block';
+    startBtn.style.display = 'inline-block';
+    assignBtn.style.display = 'inline-block';
+    shareBtn.style.display = 'inline-block';
     const base = window.PUBLIC_URL || window.location.origin;
     qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+
-        encodeURIComponent(base);
+        encodeURIComponent(base + '/game.html?code=' + code);
 }
 startBtn.addEventListener('click', async () => {
     const res = await fetch('/api/start/'+code,{method:'POST',headers:{'Authorization':adminToken}});
@@ -40,6 +47,10 @@ assignBtn.addEventListener('click', async () => {
     const res = await fetch('/api/assign-seats/'+code,{method:'POST',headers:{'Authorization':adminToken}});
     const out = await res.json();
     if(out.error) alert(out.error);
+});
+
+shareBtn.addEventListener('click', () => {
+    qrContainer.style.display = qrContainer.style.display === 'none' ? 'block' : 'none';
 });
 
 document.getElementById('code').textContent = 'Game Code: '+code;
