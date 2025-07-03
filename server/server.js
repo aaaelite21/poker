@@ -53,7 +53,7 @@ app.post('/api/login', (req, res) => {
 app.post('/api/create', requireAdmin, (req, res) => {
   const code = generateCode();
   const config = req.body;
-  games[code] = { config, players: [], locked: false, history: [] };
+  games[code] = { config, players: [], locked: false, history: [], startTime: null };
   saveGames();
   res.json({ code });
 });
@@ -99,6 +99,25 @@ app.post('/api/eliminate/:code/:playerId', requireAdmin, (req, res) => {
   res.json(player);
 });
 
+app.post('/api/start/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  if (game.startTime) return res.status(400).json({ error: 'Clock already started' });
+  game.startTime = Date.now();
+  saveGames();
+  io.to(code).emit('start', { startTime: game.startTime });
+  res.json({ startTime: game.startTime });
+});
+
+app.delete('/api/game/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  if (!games[code]) return res.status(404).json({ error: 'Game not found' });
+  delete games[code];
+  saveGames();
+  res.json({ deleted: true });
+});
+
 app.get('/api/game/:code', (req, res) => {
   const { code } = req.params;
   const game = games[code];
@@ -120,7 +139,10 @@ io.on('connection', socket => {
   socket.on('joinRoom', code => {
     socket.join(code);
     const game = games[code];
-    if (game) socket.emit('update', game);
+    if (game) {
+      socket.emit('update', game);
+      if (game.startTime) socket.emit('start', { startTime: game.startTime });
+    }
   });
 });
 

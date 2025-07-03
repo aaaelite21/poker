@@ -16,6 +16,13 @@ Open `http://<raspberry-pi>:3000` in your browser to create or join games.
 Creating or managing games requires logging in with the admin password `1234`.
 Use the login form on the main page to obtain a token before creating games.
 
+### Game Management
+
+Admins can delete finished games using the Delete buttons shown next to each game
+in the lobby. A shared tournament clock is also controlled by the admin from the
+game view using the **Start Clock** button. All connected players will see the
+same timer once started.
+
 ### Exposing on port 80
 
 To use the site with just the Pi's host name (no `:3000` suffix), run the

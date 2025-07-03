@@ -8,6 +8,7 @@
 <body>
 <h1 id="code"></h1>
 <div id="clock">00:00</div>
+<button id="start-btn" style="display:none">Start Clock</button>
 <table id="players"></table>
 <div id="pot"></div>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -15,6 +16,14 @@
 const url = new URL(window.location);
 const code = url.searchParams.get('code');
 const playerId = url.searchParams.get('player');
+const adminToken = localStorage.getItem('adminToken');
+const startBtn = document.getElementById('start-btn');
+if(adminToken) startBtn.style.display = 'block';
+startBtn.addEventListener('click', async () => {
+    const res = await fetch('/api/start/'+code,{method:'POST',headers:{'Authorization':adminToken}});
+    const out = await res.json();
+    if(out.error) alert(out.error);
+});
 
 document.getElementById('code').textContent = 'Game Code: '+code;
 const socket = io();
@@ -23,19 +32,30 @@ socket.emit('joinRoom', code);
 socket.on('update', game => {
     render(game);
 });
+socket.on('start', data => {
+    startTime = data.startTime;
+    computeTime();
+    startClock();
+});
 
 let timer = null;
 let timeRemaining = 0;
 let currentLevel = 0;
 let blindLevels = [];
 let config = {};
+let startTime = null;
 
 async function fetchGame(){
     const res = await fetch('/api/game/'+code);
     const game = await res.json();
     config = game.config;
     blindLevels = config.levels;
-    timeRemaining = config.duration;
+    startTime = game.startTime || null;
+    if(startTime){
+        computeTime();
+    }else{
+        timeRemaining = config.duration;
+    }
     render(game);
     updateClock();
 }
@@ -44,8 +64,14 @@ function updateClock(){
     const minutes = Math.floor(timeRemaining / 60);
     const seconds = timeRemaining % 60;
     document.getElementById('clock').textContent = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
-    if(timeRemaining===0){
-        nextLevel();
+}
+
+function computeTime(){
+    if(startTime!==null){
+        const elapsed = Math.floor((Date.now() - startTime)/1000);
+        currentLevel = Math.floor(elapsed / config.duration);
+        if(currentLevel >= blindLevels.length) currentLevel = blindLevels.length-1;
+        timeRemaining = config.duration - (elapsed % config.duration);
     }
 }
 
@@ -59,12 +85,8 @@ function nextLevel(){
 function startClock(){
     if(!timer){
         timer = setInterval(()=>{
-            if(timeRemaining>0){
-                timeRemaining--;
-                updateClock();
-            }else{
-                nextLevel();
-            }
+            computeTime();
+            updateClock();
         },1000);
     }
 }
@@ -77,7 +99,7 @@ function render(game){
     document.getElementById('pot').textContent = 'Total Pot $'+pot;
 }
 
-fetchGame().then(startClock);
+fetchGame().then(() => { if(startTime) startClock(); });
 </script>
 </body>
 </html>

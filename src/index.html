@@ -96,8 +96,17 @@ async function loadGames(){
     const games = await res.json();
     const list = document.getElementById('games');
     list.innerHTML = games.map(g =>
-        `<li>${g.code} - ${g.players} player${g.players===1?'':'s'}`+
-        ` <a href="game.html?code=${g.code}">View</a></li>`).join('');
+        `<li>${g.code} - ${g.players} player${g.players===1?'':'s'} `+
+        `<a href="game.html?code=${g.code}">View</a>`+
+        `${adminToken?` <button class="delete" data-code="${g.code}">Delete</button>`:''}</li>`).join('');
+    if(adminToken){
+        list.querySelectorAll('.delete').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+                await fetch('/api/game/'+btn.dataset.code,{method:'DELETE',headers:{'Authorization':adminToken}});
+                loadGames();
+            });
+        });
+    }
 }
 
 loadGames();
