@@ -9,6 +9,7 @@
 <h1 id="code"></h1>
 <div id="clock">00:00</div>
 <button id="start-btn" style="display:none">Start Clock</button>
+<img id="qr" style="display:none" alt="QR Code">
 <table id="players"></table>
 <div id="pot"></div>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -18,7 +19,13 @@ const code = url.searchParams.get('code');
 const playerId = url.searchParams.get('player');
 const adminToken = localStorage.getItem('adminToken');
 const startBtn = document.getElementById('start-btn');
-if(adminToken) startBtn.style.display = 'block';
+const qrImg = document.getElementById('qr');
+if(adminToken){
+    startBtn.style.display = 'block';
+    qrImg.style.display = 'block';
+    qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+
+        encodeURIComponent(window.location.origin);
+}
 startBtn.addEventListener('click', async () => {
     const res = await fetch('/api/start/'+code,{method:'POST',headers:{'Authorization':adminToken}});
     const out = await res.json();

@@ -25,6 +25,9 @@ in the lobby. A shared tournament clock is also controlled by the admin from the
 game view using the **Start Clock** button. All connected players will see the
 same timer once started.
 
+When viewing a game as the admin, a QR code is displayed so you can easily share
+the site's URL with players.
+
 ### Exposing on port 80
 
 To use the site with just the Pi's host name (no `:3000` suffix), run the
