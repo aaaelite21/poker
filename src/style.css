@@ -1,0 +1,107 @@
+:root {
+    --bg: #121212;
+    --primary: #00ff88;
+    --secondary: #1e1e1e;
+    --text: #ffffff;
+    --accent: #333333;
+}
+
+body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 20px;
+}
+
+h1 {
+    color: var(--primary);
+    margin-top: 0;
+}
+
+form {
+    background: var(--secondary);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+label {
+    display: flex;
+    flex-direction: column;
+}
+
+input, textarea {
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid var(--accent);
+    background: #222;
+    color: var(--text);
+    box-sizing: border-box;
+}
+
+button {
+    align-self: flex-start;
+    padding: 10px 20px;
+    background: var(--primary);
+    border: none;
+    border-radius: 5px;
+    color: var(--bg);
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+.result {
+    margin-bottom: 20px;
+    font-size: 1.2rem;
+}
+
+.game-list {
+    list-style: none;
+    padding: 0;
+}
+
+.game-list li {
+    background: var(--secondary);
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 5px;
+}
+
+.game-list a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+#clock {
+    font-size: 2rem;
+    margin: 20px 0;
+    color: var(--primary);
+    text-align: center;
+}
+
+#players {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#players th, #players td {
+    padding: 8px;
+    border: 1px solid var(--accent);
+}
+
+#players tr:nth-child(even) {
+    background: #1b1b1b;
+}
+
+#pot {
+    margin-top: 20px;
+    font-size: 1.2rem;
+}
