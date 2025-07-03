@@ -6,8 +6,10 @@ Repo for all my poker related exploits. Tournament tracker, trainer app, ect.
 ```
 cd server
 npm install
-node server.js
+npm run dev
 ```
+
+The dev command binds to `0.0.0.0` so the site is reachable from other devices on your network.
 
 Open `http://<raspberry-pi>:3000` in your browser to create or join games.
 
