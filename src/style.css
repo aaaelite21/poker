@@ -105,3 +105,32 @@ button:hover {
     margin-top: 20px;
     font-size: 1.2rem;
 }
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+#qr-container {
+    margin-top: 20px;
+}
+
+#qr {
+    max-width: 200px;
+}
+
+#level-info {
+    margin-bottom: 20px;
+}
+
+#levels-admin textarea {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.break-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
