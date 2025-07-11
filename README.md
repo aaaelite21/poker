@@ -35,6 +35,7 @@ current blind level and the next one so players know what’s coming. Players ca
 mark themselves busted from the game view and the admin can do it for them if
 they forget. Once registration is complete the admin can randomize seats using
 **Assign Seats** and those seat numbers appear on everyone’s screen.
+If someone joins accidentally the admin can remove them using the **Kick** button next to their name.
 
 Games may be locked to stop new entries. Admins can lock or unlock a game from
 either the lobby or the game page. Players visiting a game page who aren’t

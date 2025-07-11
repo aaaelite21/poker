@@ -163,6 +163,19 @@ app.post('/api/bust/:code/:playerId', (req, res) => {
   res.status(403).json({ error: 'Not allowed' });
 });
 
+app.delete('/api/kick/:code/:playerId', requireAdmin, (req, res) => {
+  const { code, playerId } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const idx = game.players.findIndex(p => p.id === playerId);
+  if (idx === -1) return res.status(404).json({ error: 'Player not found' });
+  const [removed] = game.players.splice(idx, 1);
+  recordEvent(game, `${removed.name} kicked`);
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json({ removed: true });
+});
+
 app.post('/api/stack/:code/:playerId', requireAdmin, (req, res) => {
   const { code, playerId } = req.params;
   const { stack } = req.body;

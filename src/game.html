@@ -271,13 +271,22 @@ function startClock(){
 }
 
 function render(game){
+    if(playerId && !adminToken){
+        const exists = game.players.some(p=>p.id===playerId);
+        if(!exists){
+            alert('You have been removed from the game');
+            window.location = 'index.html';
+            return;
+        }
+    }
     const table = document.getElementById('players');
     const header = '<tr><th>Seat</th><th>Name</th><th>Stack</th><th>Status</th><th>Rebuys</th><th></th></tr>';
     const rows = game.players.map(p => {
         const status = p.busted ? 'Busted' : 'In';
         let btn = '';
         if(adminToken){
-            btn = `<button class="toggle" data-id="${p.id}">${p.busted?'Unbust':'Bust'}</button>`;
+            const bustLbl = p.busted ? 'Unbust' : 'Bust';
+            btn = `<button class="toggle" data-id="${p.id}">${bustLbl}</button> <button class="kick" data-id="${p.id}">Kick</button>`;
         } else if(p.id === playerId){
             btn = `<button class="toggle" data-id="${p.id}">${p.busted?'Unbust':'I\'m Busted'}</button>`;
         }
@@ -303,6 +312,15 @@ function render(game){
                 const id = inp.dataset.id;
                 const val = inp.value;
                 await fetch(`/api/stack/${code}/${id}`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':adminToken},body:JSON.stringify({stack:val})});
+            });
+        });
+        table.querySelectorAll('.kick').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                if(!confirm('Kick this player?')) return;
+                const res = await fetch(`/api/kick/${code}/${id}`,{method:'DELETE',headers:{'Authorization':adminToken}});
+                const out = await res.json();
+                if(out.error) alert(out.error);
             });
         });
     }
