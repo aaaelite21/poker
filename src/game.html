@@ -7,14 +7,160 @@
 </head>
 <body>
 <h1 id="code"></h1>
+<form id="join-form" style="display:none">
+    <label>Name
+        <input name="name" required>
+    </label>
+    <button type="submit">Join Game</button>
+</form>
+<div id="lock-msg" class="result" style="display:none"></div>
 <div id="clock">00:00</div>
+<div class="action-buttons">
+    <button id="start-btn" style="display:none">Start Clock</button>
+    <button id="pause-btn" style="display:none">Pause Clock</button>
+    <button id="restart-btn" style="display:none">Restart Level</button>
+    <button id="assign-btn" style="display:none">Assign Seats</button>
+    <button id="lock-btn" style="display:none">Lock Game</button>
+    <button id="share-btn" style="display:none">Share</button>
+</div>
+<div id="level-info" style="text-align:center;margin-bottom:10px">
+    <div>Current: <span id="current-level"></span></div>
+    <div>Next: <span id="next-level"></span></div>
+</div>
 <table id="players"></table>
 <div id="pot"></div>
+<h2>History</h2>
+<ul id="history"></ul>
+<div id="levels-admin" style="display:none">
+    <h2>Blind Levels</h2>
+    <textarea id="levels-json" rows="4" cols="50"></textarea>
+    <button id="save-levels">Save Levels</button>
+    <div class="break-buttons">
+        <button class="break" data-min="5">Add 5m Break</button>
+        <button class="break" data-min="10">Add 10m Break</button>
+        <button class="break" data-min="15">Add 15m Break</button>
+    </div>
+</div>
+<div id="qr-container" style="display:none;text-align:center">
+    <img id="qr" alt="QR Code">
+</div>
+<script src="config.js"></script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
 const url = new URL(window.location);
 const code = url.searchParams.get('code');
 const playerId = url.searchParams.get('player');
+const adminToken = localStorage.getItem('adminToken');
+const startBtn = document.getElementById('start-btn');
+const pauseBtn = document.getElementById('pause-btn');
+const restartBtn = document.getElementById('restart-btn');
+const assignBtn = document.getElementById('assign-btn');
+const lockBtn = document.getElementById('lock-btn');
+const shareBtn = document.getElementById('share-btn');
+const qrImg = document.getElementById('qr');
+const qrContainer = document.getElementById('qr-container');
+const currentEl = document.getElementById('current-level');
+const nextEl = document.getElementById('next-level');
+const levelsDiv = document.getElementById('levels-admin');
+const levelsJson = document.getElementById('levels-json');
+const saveLevelsBtn = document.getElementById('save-levels');
+const breakBtns = document.querySelectorAll('.break');
+const joinForm = document.getElementById('join-form');
+const lockMsg = document.getElementById('lock-msg');
+
+let timer = null;
+let timeRemaining = 0;
+let currentLevel = 0;
+let blindLevels = [];
+let config = {};
+let startTime = null;
+let pausedAt = null;
+const base = window.PUBLIC_URL || window.location.origin;
+qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' +
+    encodeURIComponent(base + '/game.html?code=' + code);
+shareBtn.style.display = 'inline-block';
+if(adminToken){
+    startBtn.style.display = 'inline-block';
+    pauseBtn.style.display = 'inline-block';
+    restartBtn.style.display = 'inline-block';
+    assignBtn.style.display = 'inline-block';
+    lockBtn.style.display = 'inline-block';
+    levelsDiv.style.display = 'block';
+}
+function updateButtons(){
+    if(!adminToken) return;
+    if(!startTime){
+        startBtn.textContent = 'Start Clock';
+    }else if(pausedAt){
+        startBtn.textContent = 'Resume Clock';
+    }else{
+        startBtn.textContent = 'Start Clock';
+    }
+}
+updateButtons();
+startBtn.addEventListener('click', async () => {
+    const res = await fetch('/api/start/'+code,{method:'POST',headers:{'Authorization':adminToken}});
+    const out = await res.json();
+    if(out.error) alert(out.error);
+    else updateButtons();
+});
+pauseBtn.addEventListener('click', async () => {
+    const res = await fetch('/api/pause/'+code,{method:'POST',headers:{'Authorization':adminToken}});
+    const out = await res.json();
+    if(out.error) alert(out.error);
+    else updateButtons();
+});
+restartBtn.addEventListener('click', async () => {
+    const res = await fetch('/api/restart-level/'+code,{method:'POST',headers:{'Authorization':adminToken}});
+    const out = await res.json();
+    if(out.error) alert(out.error);
+});
+assignBtn.addEventListener('click', async () => {
+    const res = await fetch('/api/assign-seats/'+code,{method:'POST',headers:{'Authorization':adminToken}});
+    const out = await res.json();
+    if(out.error) alert(out.error);
+});
+
+lockBtn.addEventListener('click', async () => {
+    const locked = lockBtn.textContent.startsWith('Unlock');
+    const endpoint = locked ? '/api/unlock/' : '/api/lock/';
+    const res = await fetch(endpoint+code,{method:'POST',headers:{'Authorization':adminToken}});
+    const out = await res.json();
+    if(out.error) alert(out.error);
+});
+
+shareBtn.addEventListener('click', () => {
+    qrContainer.style.display = qrContainer.style.display === 'none' ? 'block' : 'none';
+});
+
+if(adminToken){
+    saveLevelsBtn.addEventListener('click', async () => {
+        let lvls;
+        try{ lvls = JSON.parse(levelsJson.value); }catch(e){ alert('Invalid JSON'); return; }
+        const res = await fetch('/api/levels/'+code,{method:'POST',headers:{'Content-Type':'application/json','Authorization':adminToken},body:JSON.stringify({levels:lvls})});
+        const out = await res.json();
+        if(out.error) alert(out.error);
+    });
+    breakBtns.forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+            const minutes = Number(btn.dataset.min);
+            const res = await fetch('/api/insert-break/'+code,{method:'POST',headers:{'Content-Type':'application/json','Authorization':adminToken},body:JSON.stringify({minutes,index:currentLevel+1})});
+            const out = await res.json();
+            if(out.error) alert(out.error);
+        });
+    });
+}
+
+if(!adminToken && !playerId){
+    joinForm.addEventListener('submit', async e => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(joinForm));
+        const res = await fetch('/api/join/'+code,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:data.name})});
+        const out = await res.json();
+        if(out.error){ alert(out.error); return; }
+        window.location = 'game.html?code='+code+'&player='+out.id;
+    });
+}
 
 document.getElementById('code').textContent = 'Game Code: '+code;
 const socket = io();
@@ -23,61 +169,175 @@ socket.emit('joinRoom', code);
 socket.on('update', game => {
     render(game);
 });
-
-let timer = null;
-let timeRemaining = 0;
-let currentLevel = 0;
-let blindLevels = [];
-let config = {};
+socket.on('start', data => {
+    startTime = data.startTime;
+    pausedAt = null;
+    computeTime();
+    startClock();
+    updateButtons();
+});
+socket.on('pause', data => {
+    pausedAt = data.pausedAt;
+    computeTime();
+    updateClock();
+    if(timer){
+        clearInterval(timer);
+        timer = null;
+    }
+    updateButtons();
+});
 
 async function fetchGame(){
     const res = await fetch('/api/game/'+code);
     const game = await res.json();
     config = game.config;
     blindLevels = config.levels;
-    timeRemaining = config.duration;
+    startTime = game.startTime || null;
+    pausedAt = game.pausedAt || null;
+    if(startTime){
+        computeTime();
+    }else{
+        const first = blindLevels[0];
+        timeRemaining = first ? (first.break?first.break*60:config.duration) : config.duration;
+    }
     render(game);
     updateClock();
+    updateButtons();
+    if(adminToken){
+        lockBtn.textContent = game.locked ? 'Unlock Game' : 'Lock Game';
+    }
+    if(!adminToken && !playerId){
+        if(game.locked){
+            joinForm.style.display = 'none';
+            lockMsg.textContent = 'Game is locked';
+            lockMsg.style.display = 'block';
+        }else{
+            lockMsg.style.display = 'none';
+            joinForm.style.display = 'block';
+        }
+    }else{
+        joinForm.style.display = 'none';
+        lockMsg.style.display = 'none';
+    }
 }
 
 function updateClock(){
     const minutes = Math.floor(timeRemaining / 60);
     const seconds = timeRemaining % 60;
     document.getElementById('clock').textContent = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
-    if(timeRemaining===0){
-        nextLevel();
+    if(blindLevels.length){
+        const cur = blindLevels[currentLevel] || {};
+        const next = blindLevels[currentLevel+1] || {};
+        currentEl.textContent = cur.break ? `Break ${cur.break}m` :
+            cur.bigBlind ? `${cur.bigBlind}/${cur.littleBlind}` : 'N/A';
+        nextEl.textContent = next.break ? `Break ${next.break}m` :
+            next.bigBlind ? `${next.bigBlind}/${next.littleBlind}` : 'N/A';
+    }
+}
+
+function computeTime(){
+    if(startTime!==null){
+        const now = pausedAt || Date.now();
+        const elapsed = Math.floor((now - startTime)/1000);
+        const durations = blindLevels.map(l => l.break ? l.break*60 : config.duration);
+        let cum = 0;
+        currentLevel = 0;
+        for(let i=0;i<durations.length;i++){
+            if(elapsed < cum + durations[i]){ currentLevel=i; timeRemaining = cum + durations[i] - elapsed; break; }
+            cum += durations[i];
+        }
+        if(elapsed >= cum + (durations[currentLevel]||0)){
+            currentLevel = durations.length-1;
+            timeRemaining = 0;
+        }
     }
 }
 
 function nextLevel(){
     if(currentLevel < blindLevels.length-1){
         currentLevel++;
-        timeRemaining = config.duration;
+        const lvl = blindLevels[currentLevel];
+        timeRemaining = lvl ? (lvl.break?lvl.break*60:config.duration) : config.duration;
     }
 }
 
 function startClock(){
     if(!timer){
         timer = setInterval(()=>{
-            if(timeRemaining>0){
-                timeRemaining--;
-                updateClock();
-            }else{
-                nextLevel();
-            }
+            computeTime();
+            updateClock();
         },1000);
     }
 }
 
 function render(game){
+    if(playerId && !adminToken){
+        const exists = game.players.some(p=>p.id===playerId);
+        if(!exists){
+            alert('You have been removed from the game');
+            window.location = 'index.html';
+            return;
+        }
+    }
     const table = document.getElementById('players');
-    table.innerHTML = '<tr><th>Seat</th><th>Name</th><th>Status</th><th>Rebuys</th></tr>' +
-        game.players.map(p => `<tr><td>${p.seat}</td><td>${p.name}</td><td>${p.eliminated?'Out':'In'}</td><td>${p.rebuys}</td></tr>`).join('');
+    const header = '<tr><th>Seat</th><th>Name</th><th>Stack</th><th>Status</th><th>Rebuys</th><th></th></tr>';
+    const rows = game.players.map(p => {
+        const status = p.busted ? 'Busted' : 'In';
+        let btn = '';
+        if(adminToken){
+            const bustLbl = p.busted ? 'Unbust' : 'Bust';
+            btn = `<button class="toggle" data-id="${p.id}">${bustLbl}</button> <button class="kick" data-id="${p.id}">Kick</button>`;
+        } else if(p.id === playerId){
+            btn = `<button class="toggle" data-id="${p.id}">${p.busted?'Unbust':'I\'m Busted'}</button>`;
+        }
+        const stackCell = adminToken ?
+            `<input type="number" class="stack" data-id="${p.id}" value="${p.stack ?? 0}">` :
+            p.stack ?? 0;
+        return `<tr><td>${p.seat??''}</td><td>${p.name}</td><td>${stackCell}</td><td>${status}</td><td>${p.rebuys}</td><td>${btn}</td></tr>`;
+    }).join('');
+    table.innerHTML = header + rows;
+    table.querySelectorAll('.toggle').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const player = game.players.find(p => p.id===id);
+            const headers = {'Content-Type':'application/json'};
+            if(adminToken) headers['Authorization'] = adminToken;
+            else headers['Player-Id'] = playerId;
+            await fetch(`/api/bust/${code}/${id}`,{method:'POST',headers,body:JSON.stringify({busted:!player.busted})});
+        });
+    });
+    if(adminToken){
+        table.querySelectorAll('.stack').forEach(inp => {
+            inp.addEventListener('change', async () => {
+                const id = inp.dataset.id;
+                const val = inp.value;
+                await fetch(`/api/stack/${code}/${id}`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':adminToken},body:JSON.stringify({stack:val})});
+            });
+        });
+        table.querySelectorAll('.kick').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                if(!confirm('Kick this player?')) return;
+                const res = await fetch(`/api/kick/${code}/${id}`,{method:'DELETE',headers:{'Authorization':adminToken}});
+                const out = await res.json();
+                if(out.error) alert(out.error);
+            });
+        });
+    }
     const pot = (game.players.length * game.config.buyin) + game.players.reduce((s,p)=>s+p.rebuys*game.config.buyin,0);
     document.getElementById('pot').textContent = 'Total Pot $'+pot;
+    const historyList = game.history.map(h => {
+        const t = new Date(h.time).toLocaleTimeString();
+        return `<li>${t} - ${h.msg}</li>`;
+    }).join('');
+    document.getElementById('history').innerHTML = historyList;
+    if(adminToken){
+        levelsJson.value = JSON.stringify(game.config.levels, null, 2);
+        lockBtn.textContent = game.locked ? 'Unlock Game' : 'Lock Game';
+    }
 }
 
-fetchGame().then(startClock);
+fetchGame().then(() => { if(startTime) startClock(); });
 </script>
 </body>
 </html>

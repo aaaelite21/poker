@@ -3,7 +3,27 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { v4: uuidv4 } = require('uuid');
+
+const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
+
+function detectIp() {
+  const nets = os.networkInterfaces();
+  for (const iface of Object.values(nets)) {
+    for (const net of iface) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return HOST;
+}
+
+const ADMIN_PASSWORD = '1234';
+let adminToken = null;
+const PUBLIC_URL = process.env.PUBLIC_URL || `http://${detectIp()}:${PORT}`;
 
 const app = express();
 const httpServer = createServer(app);
@@ -11,6 +31,10 @@ const io = new Server(httpServer, { cors: { origin: '*' } });
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../src')));
+app.get('/config.js', (req, res) => {
+  res.type('application/javascript');
+  res.send(`window.PUBLIC_URL=${JSON.stringify(PUBLIC_URL)};`);
+});
 
 const DATA_FILE = path.join(__dirname, 'games.json');
 let games = {};
@@ -32,29 +56,60 @@ function generateCode() {
   return code;
 }
 
-app.post('/api/create', (req, res) => {
+function recordEvent(game, msg) {
+  game.history.push({ time: Date.now(), msg });
+}
+
+function requireAdmin(req, res, next) {
+  const token = req.headers.authorization;
+  if (!token || token !== adminToken) {
+    return res.status(403).json({ error: 'Admin authentication required' });
+  }
+  next();
+}
+
+app.post('/api/login', (req, res) => {
+  const { password } = req.body;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Invalid password' });
+  adminToken = uuidv4();
+  res.json({ token: adminToken });
+});
+
+app.post('/api/create', requireAdmin, (req, res) => {
   const code = generateCode();
-  const config = req.body;
-  games[code] = { config, players: [], locked: false, history: [] };
+  const cfg = req.body;
+  const config = {
+    stack: Number(cfg.stack) || 0,
+    buyin: Number(cfg.buyin) || 0,
+    rebuyCutoff: Number(cfg.rebuyCutoff) || 0,
+    duration: Number(cfg.duration) || 0,
+    levels: (cfg.levels || []).map(l =>
+      l.break ? { break: Number(l.break) } : { bigBlind: Number(l.bigBlind), littleBlind: Number(l.littleBlind) }
+    )
+  };
+  games[code] = { config, players: [], locked: false, history: [], startTime: null, pausedAt: null };
   saveGames();
   res.json({ code });
 });
 
 app.post('/api/join/:code', (req, res) => {
+  if (req.headers.authorization && req.headers.authorization === adminToken) {
+    return res.status(403).json({ error: 'Admin account cannot join games' });
+  }
   const { code } = req.params;
   const { name } = req.body;
   const game = games[code];
   if (!game) return res.status(404).json({ error: 'Game not found' });
   if (game.locked) return res.status(403).json({ error: 'Game locked' });
-  const seat = game.players.length + 1;
-  const player = { id: uuidv4(), name, seat, eliminated: false, rebuys: 0 };
+  const player = { id: uuidv4(), name, seat: null, busted: false, rebuys: 0, stack: game.config.stack || 0 };
   game.players.push(player);
+  recordEvent(game, `${name} joined`);
   saveGames();
   io.to(code).emit('update', game);
   res.json(player);
 });
 
-app.post('/api/lock/:code', (req, res) => {
+app.post('/api/lock/:code', requireAdmin, (req, res) => {
   const { code } = req.params;
   const game = games[code];
   if (!game) return res.status(404).json({ error: 'Game not found' });
@@ -64,18 +119,186 @@ app.post('/api/lock/:code', (req, res) => {
   res.json({ locked: true });
 });
 
-app.post('/api/eliminate/:code/:playerId', (req, res) => {
+app.post('/api/unlock/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  game.locked = false;
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json({ locked: false });
+});
+
+app.post('/api/eliminate/:code/:playerId', requireAdmin, (req, res) => {
   const { code, playerId } = req.params;
   const { rebuy } = req.body;
   const game = games[code];
   if (!game) return res.status(404).json({ error: 'Game not found' });
   const player = game.players.find(p => p.id === playerId);
   if (!player) return res.status(404).json({ error: 'Player not found' });
-  player.eliminated = true;
+  player.busted = true;
   if (rebuy) player.rebuys += 1;
+  recordEvent(game, `${player.name} busted${rebuy ? ' and rebuys' : ''}`);
   saveGames();
   io.to(code).emit('update', game);
   res.json(player);
+});
+
+app.post('/api/bust/:code/:playerId', (req, res) => {
+  const { code, playerId } = req.params;
+  const { busted } = req.body;
+  const token = req.headers.authorization;
+  const pid = req.headers['player-id'];
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const player = game.players.find(p => p.id === playerId);
+  if (!player) return res.status(404).json({ error: 'Player not found' });
+  if (token === adminToken || pid === playerId) {
+    player.busted = !!busted;
+    recordEvent(game, `${player.name} ${player.busted ? 'busted' : 'returned'}`);
+    saveGames();
+    io.to(code).emit('update', game);
+    return res.json(player);
+  }
+  res.status(403).json({ error: 'Not allowed' });
+});
+
+app.delete('/api/kick/:code/:playerId', requireAdmin, (req, res) => {
+  const { code, playerId } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const idx = game.players.findIndex(p => p.id === playerId);
+  if (idx === -1) return res.status(404).json({ error: 'Player not found' });
+  const [removed] = game.players.splice(idx, 1);
+  recordEvent(game, `${removed.name} kicked`);
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json({ removed: true });
+});
+
+app.post('/api/stack/:code/:playerId', requireAdmin, (req, res) => {
+  const { code, playerId } = req.params;
+  const { stack } = req.body;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const player = game.players.find(p => p.id === playerId);
+  if (!player) return res.status(404).json({ error: 'Player not found' });
+  player.stack = Number(stack) || 0;
+  recordEvent(game, `${player.name} stack set to ${player.stack}`);
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json(player);
+});
+
+app.post('/api/levels/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const { levels } = req.body;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  game.config.levels = levels;
+  recordEvent(game, 'Blind levels updated');
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json({ levels });
+});
+
+app.post('/api/insert-break/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const { minutes, index } = req.body;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const idx = typeof index === 'number' ? index : game.config.levels.length;
+  game.config.levels.splice(idx, 0, { break: Number(minutes) || 5 });
+  recordEvent(game, `Inserted ${minutes}m break at level ${idx + 1}`);
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json({ levels: game.config.levels });
+});
+
+app.post('/api/assign-seats/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  const players = game.players.slice();
+  for (let i = players.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [players[i], players[j]] = [players[j], players[i]];
+  }
+  players.forEach((p, idx) => {
+    p.seat = idx + 1;
+  });
+  game.players = players;
+  recordEvent(game, 'Seats assigned');
+  players.forEach(p => recordEvent(game, `Seat ${p.seat}: ${p.name}`));
+  saveGames();
+  io.to(code).emit('update', game);
+  res.json({ assigned: true });
+});
+
+app.post('/api/start/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  if (!game.startTime) {
+    game.startTime = Date.now();
+    recordEvent(game, 'Clock started');
+  } else if (game.pausedAt) {
+    const paused = Date.now() - game.pausedAt;
+    game.startTime += paused;
+    game.pausedAt = null;
+    recordEvent(game, 'Clock resumed');
+  } else {
+    return res.status(400).json({ error: 'Clock already started' });
+  }
+  saveGames();
+  io.to(code).emit('start', { startTime: game.startTime });
+  io.to(code).emit('update', game);
+  res.json({ startTime: game.startTime });
+});
+
+app.post('/api/pause/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  if (!game.startTime || game.pausedAt) {
+    return res.status(400).json({ error: 'Clock not running' });
+  }
+  game.pausedAt = Date.now();
+  recordEvent(game, 'Clock paused');
+  saveGames();
+  io.to(code).emit('pause', { pausedAt: game.pausedAt });
+  io.to(code).emit('update', game);
+  res.json({ pausedAt: game.pausedAt });
+});
+
+app.post('/api/restart-level/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const game = games[code];
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  if (!game.startTime) return res.status(400).json({ error: 'Clock not started' });
+  const base = game.pausedAt || Date.now();
+  const elapsed = Math.floor((base - game.startTime) / 1000);
+  const durations = game.config.levels.map(l => l.break ? l.break * 60 : game.config.duration);
+  let cum = 0;
+  let level = 0;
+  for (let i = 0; i < durations.length; i++) {
+    if (elapsed < cum + durations[i]) { level = i; break; }
+    cum += durations[i];
+  }
+  game.startTime = base - cum * 1000;
+  recordEvent(game, 'Level restarted');
+  saveGames();
+  io.to(code).emit('start', { startTime: game.startTime });
+  io.to(code).emit('update', game);
+  res.json({ startTime: game.startTime });
+});
+
+app.delete('/api/game/:code', requireAdmin, (req, res) => {
+  const { code } = req.params;
+  if (!games[code]) return res.status(404).json({ error: 'Game not found' });
+  delete games[code];
+  saveGames();
+  res.json({ deleted: true });
 });
 
 app.get('/api/game/:code', (req, res) => {
@@ -86,22 +309,34 @@ app.get('/api/game/:code', (req, res) => {
 });
 
 app.get('/api/games', (req, res) => {
-  const available = Object.entries(games)
-    .filter(([, game]) => !game.locked)
+  const isAdmin = req.headers.authorization && req.headers.authorization === adminToken;
+  const list = Object.entries(games)
+    .filter(([, game]) => isAdmin || !game.locked)
     .map(([code, game]) => ({
       code,
       players: game.players.length,
+      locked: game.locked,
     }));
-  res.json(available);
+  res.json(list);
 });
 
 io.on('connection', socket => {
   socket.on('joinRoom', code => {
     socket.join(code);
     const game = games[code];
-    if (game) socket.emit('update', game);
+    if (game) {
+      socket.emit('update', game);
+      if (game.startTime) socket.emit('start', { startTime: game.startTime });
+      if (game.pausedAt) socket.emit('pause', { pausedAt: game.pausedAt });
+    }
+    const interval = setInterval(() => {
+      const g = games[code];
+      if (g) socket.emit('update', g);
+    }, 10000);
+    socket.on('disconnect', () => clearInterval(interval));
   });
 });
 
-const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+httpServer.listen(PORT, HOST, () => {
+  console.log(`Server running on http://${HOST}:${PORT}`);
+});

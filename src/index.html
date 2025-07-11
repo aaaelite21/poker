@@ -6,6 +6,16 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<h1>Admin Login</h1>
+<form id="login-form">
+    <label>Password
+        <input name="password" type="password" required>
+    </label>
+    <button type="submit">Login</button>
+</form>
+<div id="login-status" class="result"></div>
+<button id="logout-btn" style="display:none">Logout</button>
+<div id="create-section" style="display:none">
 <h1>Create Game</h1>
 <form id="create-form">
     <label>Starting Stack
@@ -25,7 +35,9 @@
     </label>
     <button type="submit">Create</button>
 </form>
+</div>
 
+<div id="join-section">
 <h1>Join Game</h1>
 <form id="join-form">
     <label>Code
@@ -36,38 +48,113 @@
     </label>
     <button type="submit">Join</button>
 </form>
+</div>
 
 <div id="result" class="result"></div>
 <h1>Available Games</h1>
 <ul id="games" class="game-list"></ul>
+<script src="config.js"></script>
 <script>
+const loginForm = document.getElementById('login-form');
+const loginStatus = document.getElementById('login-status');
+const logoutBtn = document.getElementById('logout-btn');
+let adminToken = localStorage.getItem('adminToken');
+if(adminToken){
+    loginStatus.textContent = 'Logged in';
+}
+function updateVisibility(){
+    const loggedIn = !!adminToken;
+    document.getElementById('login-form').style.display = loggedIn ? 'none' : 'block';
+    logoutBtn.style.display = loggedIn ? 'inline-block' : 'none';
+    document.getElementById('create-section').style.display = loggedIn ? 'block' : 'none';
+    document.getElementById('join-section').style.display = loggedIn ? 'none' : 'block';
+}
+updateVisibility();
+loginForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(loginForm));
+    const res = await fetch('/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:data.password})});
+    const out = await res.json();
+    if(out.token){
+        adminToken = out.token;
+        localStorage.setItem('adminToken', adminToken);
+        loginStatus.textContent = 'Logged in';
+        updateVisibility();
+        loadGames();
+    } else if(out.error){
+        alert(out.error);
+    }
+});
+logoutBtn.addEventListener('click', () => {
+    adminToken = null;
+    localStorage.removeItem('adminToken');
+    loginStatus.textContent = '';
+    updateVisibility();
+    loadGames();
+});
 const createForm = document.getElementById('create-form');
 createForm.addEventListener('submit', async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(createForm));
     data.levels = JSON.parse(data.levels);
-    const res = await fetch('/api/create', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    data.stack = Number(data.stack);
+    if(!adminToken){ alert('Admin login required'); return; }
+    const res = await fetch('/api/create', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':adminToken},
+        body:JSON.stringify(data)
+    });
     const out = await res.json();
-    document.getElementById('result').textContent = 'Game code: '+out.code;
+    if(out.code){
+        document.getElementById('result').textContent = 'Game code: '+out.code;
+    }else if(out.error){
+        document.getElementById('result').textContent = out.error;
+    }else{
+        document.getElementById('result').textContent = 'Failed to create game';
+    }
 });
 
 const joinForm = document.getElementById('join-form');
 joinForm.addEventListener('submit', async e => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(joinForm));
-    const res = await fetch('/api/join/'+data.code,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:data.name})});
+    const headers = {'Content-Type':'application/json'};
+    if(adminToken) headers['Authorization'] = adminToken;
+    const res = await fetch('/api/join/'+data.code,{method:'POST',headers,body:JSON.stringify({name:data.name})});
     const out = await res.json();
     if(out.error){ alert(out.error); return; }
     window.location='game.html?code='+data.code+'&player='+out.id;
 });
 
 async function loadGames(){
-    const res = await fetch('/api/games');
+    const headers = {};
+    if(adminToken) headers['Authorization'] = adminToken;
+    const res = await fetch('/api/games',{headers});
     const games = await res.json();
     const list = document.getElementById('games');
-    list.innerHTML = games.map(g =>
-        `<li>${g.code} - ${g.players} player${g.players===1?'':'s'}`+
-        ` <a href="game.html?code=${g.code}">View</a></li>`).join('');
+    list.innerHTML = games.map(g => {
+        const view = `<a href="game.html?code=${g.code}">View</a>`;
+        const del = adminToken ? ` <button class="delete" data-code="${g.code}">Delete</button>` : '';
+        const lock = adminToken ? ` <button class="lock" data-code="${g.code}" data-locked="${g.locked}">${g.locked?'Unlock':'Lock'}</button>` : '';
+        return `<li>${g.code} - ${g.players} player${g.players===1?'':'s'} ${view}${lock}${del}</li>`;
+    }).join('');
+    if(adminToken){
+        list.querySelectorAll('.delete').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+                await fetch('/api/game/'+btn.dataset.code,{method:'DELETE',headers:{'Authorization':adminToken}});
+                loadGames();
+            });
+        });
+        list.querySelectorAll('.lock').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+                const code = btn.dataset.code;
+                const locked = btn.dataset.locked === 'true';
+                const endpoint = locked ? '/api/unlock/' : '/api/lock/';
+                await fetch(endpoint+code,{method:'POST',headers:{'Authorization':adminToken}});
+                loadGames();
+            });
+        });
+    }
 }
 
 loadGames();
